@@ -6,8 +6,16 @@ import (
 
 // https://github.com/pdfcpu/pdfcpu/blob/4a2f04f3a268f556a4e3145d3978690b7b559cc7/pkg/api/test/encryption_test.go#L102
 func main() {
-	api.AddAttachments()
+	conf = confForAlgorithm(aes, keyLength, "upw", "opw")
+	if err = api.ChangeUserPasswordFile(outFile, "", "upw", "upwNew", conf); err != nil {
+		t.Fatalf("%s: change upw %s: %v\n", msg, outFile, err)
+	}
 
+	// Change owner password.
+	conf = confForAlgorithm(aes, keyLength, "upwNew", "opw")
+	if err = api.ChangeOwnerPasswordFile(outFile, "", "opw", "opwNew", conf); err != nil {
+		t.Fatalf("%s: change opw %s: %v\n", msg, outFile, err)
+	}
 }
 
 // func processListViewerPreferencesCommand(conf *model.Configuration) {

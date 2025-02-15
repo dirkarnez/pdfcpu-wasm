@@ -1,182 +1,80 @@
 package main
 
 import (
-	"bufio"
-	"context"
-	"flag"
-	"fmt"
-	"io/fs"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/runtime"
-	"github.com/chromedp/chromedp"
-	"github.com/graniticio/inifile"
+	"github.com/pdfcpu/pdfcpu/pkg/api"
 )
 
-var (
-	dir string
-)
-
+// https://github.com/pdfcpu/pdfcpu/blob/4a2f04f3a268f556a4e3145d3978690b7b559cc7/pkg/api/test/encryption_test.go#L102
 func main() {
-	flag.StringVar(&dir, "dir", "", "Absolute path for target directory")
+	api.AddAttachments()
 
-	flag.Parse()
-	if len(dir) < 1 {
-		log.Fatal("No --dir is given")
-	}
-
-	urlFiles := Scan(dir, ".url")
-	urlFilesLen := len(urlFiles)
-	if urlFilesLen < 1 {
-		log.Fatal("No .url file found")
-	}
-	fmt.Printf("There are %d url files\n", len(urlFiles))
-
-	file, err := os.Create(fmt.Sprintf("%s.txt", getFolderName(dir)))
-	errExit(err)
-	defer file.Close()
-	w := bufio.NewWriter(file)
-
-	for _, s := range urlFiles {
-		ic, err := inifile.NewIniConfigFromPath(s)
-		errExit(err)
-		url, err := ic.Value("InternetShortcut", "URL")
-		errExit(err)
-		fmt.Println("checking", url, ", in", s, "...")
-		protocol := url[0:strings.Index(url, `://`)]
-		if protocol == `http` || protocol == `https` {
-			title, err := getTitle(url)
-			errExit(err)
-			fmt.Fprintf(w, "- [%s](%s)\n", title, url)
-		} else {
-			fmt.Fprintf(w, "- [%s](%s)\n", url, url)
-		}
-	}
-	errExit(w.Flush())
-
-	// for _, s := range urlFiles {
-	// 	errExit(os.Remove(s))
-	// }
 }
 
-func errExit(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+// func processListViewerPreferencesCommand(conf *model.Configuration) {
+// 	if len(flag.Args()) != 1 || selectedPages != "" {
+// 		fmt.Fprintf(os.Stderr, "usage: %s\n", usageViewerPreferencesList)
+// 		os.Exit(1)
+// 	}
 
-func Scan(root, ext string) []string {
-	var a []string
-	filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
-		if e != nil {
-			return e
-		}
-		if filepath.Ext(d.Name()) == ext {
-			a = append(a, s)
-		}
-		return nil
-	})
-	return a
-}
+// 	inFile := flag.Arg(0)
+// 	// if conf.CheckFileNameExt {
+// 	// 	ensurePDFExtension(inFile)
+// 	// }
 
-func getTitle(urlstr string) (string, error) {
-	ctx, cancel := chromedp.NewContext(context.Background())
-	defer cancel()
-	var title string
+// 	if json {
+// 		log.SetCLILogger(nil)
+// 	}
 
-	chromedp.ListenTarget(ctx, func(ev interface{}) {
+// 	process(cli.ListViewerPreferencesCommand(inFile, all, json, conf))
+// }
 
-		switch ev := ev.(type) {
+// // ListViewerPreferencesCommand creates a new command to list the viewer preferences.
+// func ListViewerPreferencesCommand(inFile string, all, json bool, conf *model.Configuration) *Command {
 
-		case *network.EventResponseReceived:
-			resp := ev.Response
-			if resp.URL == urlstr {
-				log.Printf("received headers: %s %s", resp.URL, resp.MimeType)
-				if resp.MimeType != "text/html" {
-					chromedp.Cancel(ctx)
-				}
+// 	if conf == nil {
+// 		conf = model.NewDefaultConfiguration()
+// 	}
+// 	conf.Cmd = model.LISTVIEWERPREFERENCES
+// 	return &Command{
+// 		Mode:     model.LISTVIEWERPREFERENCES,
+// 		InFile:   &inFile,
+// 		BoolVal1: all,
+// 		BoolVal2: json,
+// 		Conf:     conf}
+// }
 
-				if strings.Contains(resp.URL, "youtube.com") {
-					log.Printf("YT!!")
-				}
+// func process(cmd *cli.Command) {
+// 	out, err := cli.Process(cmd)
+// 	if err != nil {
+// 		if needStackTrace {
+// 			fmt.Fprintf(os.Stderr, "Fatal: %+v\n", err)
+// 		} else {
+// 			fmt.Fprintf(os.Stderr, "%v\n", err)
+// 		}
+// 		os.Exit(1)
+// 	}
 
-				// may be redirected
-				switch ContentType := resp.Headers["Content-Type"].(type) {
-				case string:
-					// here v has type T
-					if !strings.Contains(ContentType, "text/html") {
-						chromedp.Cancel(ctx)
-					}
-				}
+// 	if out != nil && !quiet {
+// 		for _, s := range out {
+// 			fmt.Fprintln(os.Stdout, s)
+// 		}
+// 	}
+// 	//os.Exit(0)
+// }
 
-				switch ContentType := resp.Headers["content-type"].(type) {
-				case string:
-					// here v has type T
-					if !strings.Contains(ContentType, "text/html") {
-						chromedp.Cancel(ctx)
-					}
-				}
-			}
-		}
-	})
+// // Process executes a pdfcpu command.
+// func Process(cmd *Command) (out []string, err error) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			err = errors.Errorf("unexpected panic attack: %v\n", r)
+// 		}
+// 	}()
 
-	req := `
-(async () => new Promise((resolve, reject) => {
-	var handle = NaN;
+// 	cmd.Conf.Cmd = cmd.Mode
 
-	(function animate() {
-		if (!isNaN(handle)) {
-			clearTimeout(handle);
-		}
+// 	if f, ok := cmdMap[cmd.Mode]; ok {
+// 		return f(cmd)
+// 	}
 
-		if (document.title.length > 0 && !document.title.startsWith("http")) {
-			resolve(document.title);
-		} else {
-			handle = setTimeout(animate, 1000);
-		}
-	}());
-}));
-`
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(urlstr),
-		//chromedp.Evaluate(`window.location.href`, &res),
-		chromedp.Evaluate(req, nil, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
-			return p.WithAwaitPromise(true)
-		}),
-		chromedp.Title(&title),
-	)
-	if err == context.Canceled {
-		// url as title
-		log.Printf("Cancel!!")
-		return urlstr, nil
-	}
-
-	return title, err
-}
-
-// fmt.Println(getFolderName(`P`))           //P
-// fmt.Println(getFolderName(`P:`))          //P
-// fmt.Println(getFolderName(`P:\`))         //P
-// fmt.Println(getFolderName(`P:\testing`))  //testing
-// fmt.Println(getFolderName(`P:\testing\`)) //testing
-func getFolderName(input string) string {
-	var folderName string
-	lastIndex := strings.LastIndex(input, `\`)
-	length := len(input)
-	if lastIndex+1 == length {
-		lastIndex = strings.LastIndex(input[0:length-1], `\`)
-		folderName = input[lastIndex+1 : length-1]
-	} else {
-		folderName = input[lastIndex+1 : length]
-	}
-
-	if folderName[len(folderName)-1:] == ":" {
-		return folderName[0 : len(folderName)-1]
-	} else {
-		return folderName
-	}
-}
+// 	return nil, errors.Errorf("pdfcpu: process: Unknown command mode %d\n", cmd.Mode)
+// }
